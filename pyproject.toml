@@ -1,0 +1,27 @@
+[project]
+name = "xcsp2cpo"
+version = "0.1.0"
+description = "Convert XCSP3 constraint satisfaction problems to IBM CP Optimizer (CPO) format"
+requires-python = ">=3.10"
+dependencies = [
+    "lxml>=4.6.0",
+    "click>=8.0.0",
+    "pytest>=7.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+xcsp2cpo = "xcsp2cpo.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
