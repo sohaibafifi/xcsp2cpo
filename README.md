@@ -169,4 +169,4 @@ maximize(46*x[0] + 46*x[1] + 38*x[2] + 88*x[3] + 3*x[4]);
 
 ## License
 
-MIT
+MIT License. See `LICENSE`.
