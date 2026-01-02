@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import lzma
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import Optional, Union
 
 from .model import (
@@ -43,10 +45,27 @@ def parse_xcsp(xml_content: str) -> Model:
     return model
 
 
-def parse_xcsp_file(filepath: str) -> Model:
-    """Parse XCSP3 XML file into a Model."""
-    with open(filepath, "r", encoding="utf-8") as f:
-        return parse_xcsp(f.read())
+def parse_xcsp_file(filepath: str | Path) -> Model:
+    """Parse XCSP3 XML file into a Model.
+
+    Supports both plain XML files and LZMA-compressed XML files (.xml.lzma).
+
+    Args:
+        filepath: Path to the XCSP3 file (can be .xml or .xml.lzma)
+
+    Returns:
+        Parsed Model
+    """
+    filepath = Path(filepath)
+
+    if filepath.suffix == ".lzma" or str(filepath).endswith(".xml.lzma"):
+        # LZMA-compressed file
+        with lzma.open(filepath, "rt", encoding="utf-8") as f:
+            return parse_xcsp(f.read())
+    else:
+        # Plain XML file
+        with open(filepath, "r", encoding="utf-8") as f:
+            return parse_xcsp(f.read())
 
 
 def _parse_variables(elem: ET.Element, model: Model) -> None:
