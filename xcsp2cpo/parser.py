@@ -269,6 +269,23 @@ def _convert_expression(expr: str, model: Model) -> str:
         if func_name == "dist" and len(converted_args) == 2:
             return f"abs({converted_args[0]} - {converted_args[1]})"
 
+        # Set membership: in(var, set(a, b, c)) -> (var == a || var == b || var == c)
+        if func_name == "in" and len(args) == 2:
+            var_expr = converted_args[0]
+            set_arg = args[1].strip()
+            # Check if second arg is a set(...) expression
+            set_match = re.match(r"set\((.+)\)$", set_arg, re.DOTALL | re.IGNORECASE)
+            if set_match:
+                set_elements_str = set_match.group(1)
+                set_elements = _split_args(set_elements_str)
+                converted_elements = [_convert_expression(e, model) for e in set_elements]
+                # Create disjunction: var == e1 || var == e2 || ...
+                equalities = [f"({var_expr} == {elem})" for elem in converted_elements]
+                return "(" + " || ".join(equalities) + ")"
+            else:
+                # in(var, value) without set - just equality
+                return f"({var_expr} == {converted_args[1]})"
+
         # Default: keep as function call
         return f"{func_name}({', '.join(converted_args)})"
 
