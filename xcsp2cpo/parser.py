@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import lzma
 import re
+import warnings
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, Union
@@ -87,6 +88,29 @@ def _parse_var(elem: ET.Element) -> Optional[Variable]:
     if not var_id:
         return None
 
+    # Check for symbolic type (string domain) - not supported
+    var_type = elem.get("type", "integer")
+    if var_type == "symbolic":
+        warnings.warn(
+            f"Variable '{var_id}' has symbolic (string) domain which is not supported. "
+            f"Skipping this variable.",
+            UserWarning
+        )
+        return None
+
+    # Check for "as" attribute (referencing another variable's domain)
+    as_ref = elem.get("as")
+    if as_ref:
+        # This variable references another's domain
+        # For now, we can't resolve this without more context
+        # Just use a default domain and warn if symbolic
+        warnings.warn(
+            f"Variable '{var_id}' uses 'as' reference to '{as_ref}'. "
+            f"Domain resolution not fully supported.",
+            UserWarning
+        )
+        return None
+
     domain_str = elem.text.strip() if elem.text else "0..1"
     domain = Domain.from_string(domain_str)
 
@@ -162,8 +186,14 @@ def _parse_constraint(elem: ET.Element, model: Model) -> Optional[Constraint | l
         return _parse_group(elem, model)
     elif tag == "block":
         return _parse_block(elem, model)
-
-    return None
+    else:
+        # Unknown constraint type - emit warning
+        warnings.warn(
+            f"Unknown constraint type '{tag}' encountered during parsing. "
+            f"This constraint will be skipped.",
+            UserWarning
+        )
+        return None
 
 
 def _parse_intension(elem: ET.Element, constraint_id: Optional[str], model: Model) -> IntensionConstraint:

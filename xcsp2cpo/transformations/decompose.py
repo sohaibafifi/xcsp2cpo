@@ -103,9 +103,22 @@ def decompose_constraint(constraint: "Constraint") -> list["Constraint"]:
     elif constraint.type == ConstraintType.CHANNEL:
         return decompose_channel(constraint)
     else:
-        # No decomposition known, return as-is
-        # This will cause an error later if the constraint is truly unsupported
+        # No decomposition known - emit warning and return as-is
+        constraint_type = constraint.type.value
+        if constraint_type not in _warned_constraints:
+            _warned_constraints.add(constraint_type)
+            warnings.warn(
+                f"Constraint '{constraint_type}' is not supported and has no decomposition. "
+                f"Output may be incomplete or invalid.",
+                UserWarning
+            )
         return [constraint]
+
+
+def reset_warnings() -> None:
+    """Reset the warned constraints set. Useful for testing."""
+    global _warned_constraints
+    _warned_constraints = set()
 
 
 def decompose_allequal(constraint: AllEqualConstraint) -> list["Constraint"]:

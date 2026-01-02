@@ -20,6 +20,9 @@ python main.py input.xml
 # Convert to stdout
 xcsp2cpo problem.xml
 
+# Convert LZMA-compressed file
+xcsp2cpo problem.xml.lzma
+
 # Convert to file
 xcsp2cpo problem.xml -o problem.cpo
 
@@ -28,6 +31,9 @@ cat problem.xml | xcsp2cpo -
 
 # Verbose mode
 xcsp2cpo problem.xml -v
+
+# Show all warnings (unsupported features)
+python -W always main.py problem.xml
 ```
 
 ## Example
@@ -66,7 +72,44 @@ x = [intVar(0, 1), intVar(0, 1), intVar(0, 1), intVar(0, 1), intVar(0, 1)];
 maximize(46*x[0] + 46*x[1] + 38*x[2] + 88*x[3] + 3*x[4]);
 ```
 
+## Architecture
+
+The converter uses a transformation pipeline inspired by [CPMpy](https://github.com/CPMpy/cpmpy):
+
+```
+[XCSP3 XML / XML.LZMA]
+        |
+        v
+    parser.py --> IR Model (model.py)
+        |
+        v
+    transformations/
+      |-- normalize.py    (expand arrays, flatten groups)
+      |-- decompose.py    (convert unsupported constraints)
+      +-- rewrite.py      (normalize expressions)
+        |
+        v
+    writer.py --> CPO Output
+```
+
+### Transformation Pipeline
+
+Unsupported constraints are automatically decomposed into equivalent supported forms:
+
+| Constraint | Decomposition |
+|------------|---------------|
+| `allEqual(x, y, z)` | `x == y; x == z;` |
+| `ordered([x, y, z], le)` | `x <= y; y <= z;` |
+| `channel(list1, list2)` | Pairwise inverse constraints |
+
 ## Supported Features
+
+### File Formats
+
+| Format | Status |
+|--------|--------|
+| `.xml` | Supported |
+| `.xml.lzma` | Supported |
 
 ### Variables
 
@@ -77,26 +120,26 @@ maximize(46*x[0] + 46*x[1] + 38*x[2] + 88*x[3] + 3*x[4]);
 | `<array>` multi-dimensional | Flattened array | Supported |
 | Domain ranges (`1..10`) | `1..10` | Supported |
 | Domain enumeration (`0 1 2`) | `0, 1, 2` | Supported |
+| Symbolic domains | - | Not supported (warning) |
 
 ### Constraints
 
-| XCSP3 | CPO | Status |
-|-------|-----|--------|
-| `intension` | Infix expression | Supported |
-| `extension` (supports) | `allowedAssignments()` | Supported |
-| `extension` (conflicts) | `forbiddenAssignments()` | Supported |
-| `allDifferent` | `alldiff()` | Supported |
-| `allDifferent` with except | `alldiff()` | Partial |
-| `allEqual` | Pairwise `==` | Supported |
-| `ordered` | Comparison chain | Supported |
-| `sum` | Linear expression | Supported |
-| `count` | `count()` | Supported |
-| `nValues` | `numberOfDifferentValues()` | Supported |
-| `cardinality` | `distribute()` | Supported |
-| `minimum` | `min()` | Supported |
-| `maximum` | `max()` | Supported |
-| `element` | `element()` | Supported |
-| `channel` | Pairwise constraints | Supported |
+| XCSP3 | CPO | Transformation |
+|-------|-----|----------------|
+| `intension` | Infix expression | direct |
+| `extension` (supports) | `allowedAssignments()` | direct |
+| `extension` (conflicts) | `forbiddenAssignments()` | direct |
+| `allDifferent` | `alldiff()` | direct |
+| `allEqual` | Pairwise `==` | decompose |
+| `ordered` | Comparison chain | decompose |
+| `sum` | Linear expression | direct |
+| `count` | `count()` | direct |
+| `nValues` | `numberOfDifferentValues()` | direct |
+| `cardinality` | `distribute()` | direct |
+| `minimum` | `min()` | direct |
+| `maximum` | `max()` | direct |
+| `element` | `element()` | direct |
+| `channel` | Pairwise constraints | decompose |
 
 ### Objectives
 
@@ -129,6 +172,8 @@ maximize(46*x[0] + 46*x[1] + 38*x[2] + 88*x[3] + 3*x[4]);
 
 ## Not Yet Supported
 
+Unsupported features will generate warnings during conversion.
+
 ### Constraints
 
 | XCSP3 | Notes |
@@ -148,6 +193,7 @@ maximize(46*x[0] + 46*x[1] + 38*x[2] + 88*x[3] + 3*x[4]);
 
 | XCSP3 | Notes |
 |-------|-------|
+| `symbolic` | String/symbolic domains |
 | `realVar` | Real/continuous variables |
 | `setVar` | Set variables |
 | `graphVar` | Graph variables |
@@ -162,10 +208,29 @@ maximize(46*x[0] + 46*x[1] + 38*x[2] + 88*x[3] + 3*x[4]);
 | DisCSP | Distributed CSP |
 | Multi-objective | Multiple objectives |
 
+## Python API
+
+```python
+from xcsp2cpo.converter import convert_to_cpo, convert_file
+
+# Convert XML string
+cpo_output = convert_to_cpo(xml_content)
+
+# Convert file (supports .xml and .xml.lzma)
+cpo_output = convert_file("problem.xml.lzma")
+
+# Convert and write to file
+convert_file("input.xml.lzma", output_path="output.cpo")
+
+# Disable transformation pipeline (use legacy mode)
+cpo_output = convert_to_cpo(xml_content, use_transformations=False)
+```
+
 ## References
 
 - [XCSP3 Specifications](https://xcsp.org/specifications/)
 - [IBM CP Optimizer File Format](https://www.ibm.com/docs/en/icos/22.1.2?topic=manual-cp-optimizer-file-format-syntax)
+- [CPMpy](https://github.com/CPMpy/cpmpy) - Inspiration for transformation architecture
 
 ## License
 
